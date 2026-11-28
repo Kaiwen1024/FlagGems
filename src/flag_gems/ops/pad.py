@@ -501,6 +501,12 @@ def pad(self, pad, mode="constant", value=None):
                 pad_l <= input_size and pad_r <= input_size
             ), "Padding value causes wrapping around more than once."
 
+    if mode == 'constant' and os.environ.get('GEMS_ASCEND_M2_FFT_PADDING') == '1':
+        from ascend_fft_padding import run as fft_pad
+        result = fft_pad(self, pad, value)
+        if result is not None:
+            return result
+
     out = _pad_func(self, pad, mode, float(value))
     return out
 

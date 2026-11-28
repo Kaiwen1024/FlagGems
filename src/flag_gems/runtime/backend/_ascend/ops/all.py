@@ -106,6 +106,12 @@ def all_kernel_2(mid, out, MID_SIZE, BLOCK_MID: tl.constexpr):
 
 def all(inp):
     logger.debug("GEMS_ASCEND ALL")
+    logical = __import__('os').environ.get('FLAGGEMS_ASCEND_LOGICAL_ALL')=='1'
+    if logical:
+        if inp.numel()==0:
+            return torch.ones((),device=inp.device,dtype=torch.uint8 if inp.dtype==torch.uint8 else torch.bool)
+        # Both reduction stages index linear storage. Materialize the logical input order first.
+        inp=inp.contiguous()
     n_elements = inp.numel()
     block_size = triton.next_power_of_2(math.ceil(math.sqrt(n_elements)))
     mid_size = triton.cdiv(n_elements, block_size)
@@ -118,7 +124,7 @@ def all(inp):
         all_kernel_1[(mid_size, 1)](inp, mid, n_elements, mid_size, block_size)
         all_kernel_2[(1, 1)](mid, out, mid_size, block_mid)
 
-    return out
+    return out.to(torch.uint8) if logical and inp.dtype==torch.uint8 else out
 
 
 def all_dim(inp, dim=None, keepdim=False):

@@ -16,6 +16,8 @@ import logging
 
 import torch
 import triton
+import triton.language as tl
+from flag_gems.runtime import torch_device_fn
 
 from flag_gems.utils import pointwise_dynamic
 from flag_gems.utils.codegen_config_utils import CodeGenConfig
@@ -38,6 +40,18 @@ config_ = CodeGenConfig(
 def copy_func(x):
     return x
 
+
+
+@triton.jit
+def _flip_matrix_kernel(X, Y, N, W, SX0, SX1, SY0, SY1,
+                        ROW: tl.constexpr, COL: tl.constexpr, BLOCK: tl.constexpr):
+    idx = tl.program_id(0).to(tl.int64) * BLOCK + tl.arange(0, BLOCK)
+    yrow = idx // W
+    ycol = idx % W
+    xrow = N // W - 1 - yrow if ROW else yrow
+    xcol = W - 1 - ycol if COL else ycol
+    data = tl.load(X + xrow * SX0 + xcol * SX1, idx < N, other=0)
+    tl.store(Y + yrow * SY0 + ycol * SY1, data, idx < N)
 
 def flip(A: torch.Tensor, dims) -> torch.Tensor:
     logger.debug("GEMS_ASCEND FLIP")
@@ -63,6 +77,12 @@ def flip(A: torch.Tensor, dims) -> torch.Tensor:
     if n == 0 or A.numel() <= 1:
         return A.clone()
     out = torch.empty_like(A)
+    if A.ndim == 2:
+        with torch_device_fn.device(A.device):
+            _flip_matrix_kernel[(triton.cdiv(A.numel(), 256),)](
+                A, out, A.numel(), A.shape[1], *A.stride(), *out.stride(),
+                flip_dims_b[0], flip_dims_b[1], 256)
+        return out
     # a flipped view of A
     flipped_A = StridedBuffer(A, strides=strides, offset=offset)
 

@@ -1201,6 +1201,20 @@ for _alias, _target in (
         FULL_CONFIG_BY_FUNC.setdefault(_alias, []).extend(FULL_CONFIG_BY_FUNC[_target])
 
 
+
+def _maybe_apply_ascend_planb(stage: str):
+    import os as _os
+    if _os.environ.get("FLAGGEMS_ASCEND_FIXES", "1").strip().lower() in ("0", "false", "no", "off"):
+        return
+    try:
+        from ascend_gems_fixes import activate as _agf
+        if stage == "pre":
+            _agf.apply_pre_enable_fixes()
+        elif stage == "post":
+            _agf.apply_post_enable_fixes()
+    except ImportError:
+        pass
+
 def enable(
     lib=aten_lib,
     unused=None,
@@ -1229,6 +1243,7 @@ def enable(
         - If the exclude list/YAML resolves to empty, all ops are registered.
     """
     global current_work_registrar
+    _maybe_apply_ascend_planb("pre")
     exclude_ops = resolve_user_setting(unused, "exclude")
     current_work_registrar = registrar(
         _FULL_CONFIG,
@@ -1238,6 +1253,7 @@ def enable(
         lib=lib,
     )
     setup_flaggems_logging(path=path, record=record, once=once)
+    _maybe_apply_ascend_planb("post")
 
 
 def only_enable(

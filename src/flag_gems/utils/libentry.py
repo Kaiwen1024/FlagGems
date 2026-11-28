@@ -20,6 +20,7 @@ import inspect
 import logging
 import math
 import multiprocessing
+import threading
 import os
 import time
 import warnings
@@ -1557,7 +1558,9 @@ class LibEntry(triton.KernelInterface):
             for p in self.jit_function.params
             if not p.is_constexpr and p.do_not_specialize
         ]
-        self.lock = multiprocessing.Lock()
+        # Independent evaluation processes share no Python kernel cache.
+        self.lock = (threading.Lock() if os.getenv('FLAGGEMS_PROCESS_LOCAL_CACHE_LOCK') == '1'
+                     else multiprocessing.Lock())
         self.signature = fn.signature
 
     @staticmethod

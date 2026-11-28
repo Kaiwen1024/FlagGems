@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 def conv1d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
     logger.debug("GEMS CONV1D")
+    if __import__('os').environ.get('GEMS_ASCEND_DEPTHWISE_1D')=='1':
+        from depthwise_npu import run as depthwise_npu
+        output=depthwise_npu(input,weight,bias,stride,padding,dilation,groups)
+        if output is not None:return output
+
     if isinstance(stride, (list, tuple)):
         stride_width = stride[0]
     else:

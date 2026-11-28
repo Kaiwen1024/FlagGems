@@ -70,6 +70,8 @@ def chunk_gated_delta_rule_fwd_kernel_h_blockdim64(
     stride_k = Hg * K
     stride_w = H * K
 
+    gate_base = bos if IS_VARLEN else bos * H
+
     b_h1_bv1 = tl.zeros([128, 64], dtype=tl.float32)
     b_h1_bv2 = tl.zeros([128, 64], dtype=tl.float32)
 
@@ -126,11 +128,11 @@ def chunk_gated_delta_rule_fwd_kernel_h_blockdim64(
         v_new_base = v_new + bos * H * V + i_h * V
 
         last_idx = min((i_t + 1) * BT, T) - 1
-        b_g_last = tl.load(g + bos + i_h * T_max + last_idx)
+        b_g_last = tl.load(g + gate_base + i_h * T_max + last_idx)
 
         offs_t = i_t * BT + tl.arange(0, BT)
         mask_t = offs_t < T
-        g_ptr = g + bos + i_h * T_max
+        g_ptr = g + gate_base + i_h * T_max
         b_g = tl.load(g_ptr + offs_t, mask=mask_t, other=0.0)
 
         b_g = safe_exp(b_g_last - b_g)

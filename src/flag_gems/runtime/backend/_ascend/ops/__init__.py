@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .add import add
 from .addmm import addmm, addmm_dtype, addmm_dtype_out, addmm_out
 from .all import all, all_dim, all_dims
 from .amax import amax
@@ -64,6 +65,8 @@ from .linalg_lstsq import linalg_lstsq
 from .linalg_lu import linalg_lu, linalg_lu_out
 from .linalg_lu_factor import linalg_lu_factor, linalg_lu_factor_out
 from .linalg_lu_factor_ex import linalg_lu_factor_ex, linalg_lu_factor_ex_out
+from .linear import linear
+from .mul import mul
 from .linspace import linspace
 from .log_sigmoid_backward import log_sigmoid_backward, log_sigmoid_backward_out
 from .log_softmax import log_softmax, log_softmax_backward, log_softmax_out
@@ -123,6 +126,9 @@ from .zeros import zeros
 from .zeros_like import zeros_like
 
 __all__ = [
+    "mul",
+    "add",
+    "linear",
     "_unique2",
     "_upsample_bicubic2d_aa",
     "addmm",

@@ -96,7 +96,7 @@ def rand_heur_block(args):
     if args["N"] <= 512:
         return 2048
     else:
-        return 4097
+        return 4096
 
 
 def rand_heur_num_warps(args):
@@ -112,7 +112,7 @@ def randn_heur_block(args):
     if args["N"] <= 512:
         return 2048
     else:
-        return 4097
+        return 4096
 
 
 def randn_heur_num_warps(args):
@@ -189,7 +189,7 @@ def uniform_heur_block(args):
     if args["N"] <= 512:
         return 512
     elif args["N"] >= 1073741824:
-        return 4097
+        return 4096
     else:
         return 1024
 

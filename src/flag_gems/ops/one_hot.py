@@ -43,13 +43,29 @@ def one_hot_kernel(
         col_mask = col_offsets < num_classes
         result = target_classes[:, None] == col_offsets[None, :]
         result = result.to(tl.int64)
-        offs_2d = row_offsets[:, None] * num_classes + col_offsets[None, :]
+        offs_2d = row_offsets[:, None].to(tl.int64) * num_classes + col_offsets[None, :]
         tl.store(out_ptr + offs_2d, result, mask=row_mask[:, None] & col_mask[None, :])
 
 
 def one_hot(tensor: torch.Tensor, num_classes: int = -1) -> torch.Tensor:
     logger.debug("GEMS ONE_HOT")
-    if not tensor.is_cuda:
+    if tensor.device.type == "npu":
+        if tensor.dtype != torch.int64:
+            raise RuntimeError("one_hot requires a LongTensor")
+        if tensor.numel() == 0:
+            if num_classes < 1:
+                raise RuntimeError("Cannot infer classes from an empty tensor")
+            return torch.empty((*tensor.shape,num_classes),dtype=torch.int64,device=tensor.device)
+        if num_classes < -1 or num_classes == 0:
+            raise RuntimeError("Invalid number of classes")
+        if int(tensor.min().item()) < 0:
+            raise RuntimeError("Class values must be non-negative")
+        max_id=int(tensor.max().item())
+        if num_classes == -1:
+            num_classes=max_id+1
+        elif max_id>=num_classes:
+            raise RuntimeError("Class values must be smaller than num_classes")
+    elif not tensor.is_cuda:
         return torch.nn.functional.one_hot(tensor, num_classes)
     if not tensor.is_contiguous():
         tensor = tensor.contiguous()

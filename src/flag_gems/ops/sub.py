@@ -55,8 +55,20 @@ sub_func_scalar_tensor.register_complex(
 )
 
 
+def _move_cpu_scalar(A, B):
+    # Preserve zero-dimensional dtype promotion while moving a permitted CPU
+    # scalar to the device from which the arithmetic kernel can read it.
+    if isinstance(A, torch.Tensor) and isinstance(B, torch.Tensor):
+        if A.device.type == "cpu" and A.ndim == 0 and B.device.type != "cpu":
+            A = A.to(B.device)
+        elif B.device.type == "cpu" and B.ndim == 0 and A.device.type != "cpu":
+            B = B.to(A.device)
+    return A, B
+
+
 def sub(A, B, *, alpha=1):
     logger.debug("GEMS SUB")
+    A, B = _move_cpu_scalar(A, B)
     A_is_complex = (isinstance(A, torch.Tensor) and A.is_complex()) or isinstance(
         A, complex
     )
@@ -108,6 +120,8 @@ def sub(A, B, *, alpha=1):
 
 def sub_(A, B, *, alpha=1):
     logger.debug("GEMS SUB_")
+    if isinstance(B, torch.Tensor) and B.device.type == "cpu" and B.ndim == 0:
+        B = B.to(A.device)
     if isinstance(B, torch.Tensor):
         return sub_func(A, B, alpha, out0=A)
     else:

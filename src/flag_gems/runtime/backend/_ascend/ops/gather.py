@@ -64,8 +64,42 @@ def _gather_flat_kernel_fixed(
     tl.store(out + offset, val, mask=mask)
 
 
+
+@libentry()
+@triton.jit
+def _gather_strided_3d(X, I, Y, N, S1, S2, XS0,XS1,XS2, IS0,IS1,IS2, YS0,YS1,YS2,
+                       DIM:tl.constexpr, BLOCK:tl.constexpr):
+    offs=tl.program_id(0)*BLOCK+tl.arange(0,BLOCK)
+    t=offs//S2
+    k=offs%S2
+    i=t//S1
+    j=t%S1
+    valid=offs<N
+    idx=tl.load(I+i*IS0+j*IS1+k*IS2,valid,other=0).to(tl.int32)
+    if DIM==0:
+        xidx=idx*XS0+j*XS1+k*XS2
+    elif DIM==1:
+        xidx=i*XS0+idx*XS1+k*XS2
+    else:
+        xidx=i*XS0+j*XS1+idx*XS2
+    val=tl.load(X+xidx,valid,other=0)
+    tl.store(Y+i*YS0+j*YS1+k*YS2,val,valid)
+
 def gather_flat_fixed(inp: torch.Tensor, dim: int, index: torch.Tensor, out=None):
     logger.debug("GEMS_ASCEND GATHER")
+
+    # The flat kernel addresses index linearly; expand() may give it zero strides.
+    if inp.ndim==3 and index.ndim==3 and index.dtype==torch.int64 and (out is None or out.shape==index.shape):
+        if out is None:
+            out=torch.empty(index.shape,dtype=inp.dtype,device=inp.device)
+        if index.numel()==0:return out
+        if (0<inp.numel() and index.numel()<=2**31-1024 and
+            all(sum((n-1)*st for n,st in zip(v.shape,v.stride()))<=2**31-1024 for v in (inp,index,out))
+            and all(index.shape[j]<=inp.shape[j] for j in range(3) if j!=dim%3)):
+            _gather_strided_3d[(triton.cdiv(index.numel(),512),)](inp,index,out,index.numel(),index.shape[1],index.shape[2],
+                *inp.stride(),*index.stride(),*out.stride(),dim%3,512)
+            return out
+    index = index.contiguous()
 
     if out is None:
         out = torch.empty_like(index, dtype=inp.dtype, device=inp.device)

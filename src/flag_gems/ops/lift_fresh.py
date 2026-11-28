@@ -71,6 +71,8 @@ def lift_fresh(*args, **kwargs):
     out = torch.empty_like(x_contig, memory_format=torch.contiguous_format)
 
     n_elements = x_contig.numel()
+    if n_elements == 0:
+        return out.view_as(x_contig)
     # BLOCK_SIZE=1024 mirrors the sibling lift_fresh_copy kernel; the op is a
     # memory-bandwidth-bound copy, so a fixed block matches its performance.
     grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)

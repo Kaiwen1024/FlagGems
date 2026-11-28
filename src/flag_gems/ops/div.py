@@ -85,8 +85,20 @@ true_div_func_scalar_tensor.register_complex(
 )
 
 
+def _move_cpu_scalar(A, B):
+    # PyTorch permits a CPU zero-dimensional scalar in a device operation.
+    # Keep it a tensor so rank/dtype-based promotion remains unchanged.
+    if isinstance(A, torch.Tensor) and isinstance(B, torch.Tensor):
+        if A.device.type == "cpu" and A.ndim == 0 and B.device.type != "cpu":
+            A = A.to(B.device)
+        elif B.device.type == "cpu" and B.ndim == 0 and A.device.type != "cpu":
+            B = B.to(A.device)
+    return A, B
+
+
 def true_divide(A, B):
     logger.debug("GEMS TRUE_DIVIDE")
+    A, B = _move_cpu_scalar(A, B)
     if isinstance(A, torch.Tensor) and isinstance(B, torch.Tensor):
         return true_div_func(A, B)
     elif isinstance(A, torch.Tensor):
@@ -100,6 +112,7 @@ def true_divide(A, B):
 
 def true_divide_out(A, B, out):
     logger.debug("GEMS TRUE_DIVIDE OUT")
+    A, B = _move_cpu_scalar(A, B)
     if isinstance(A, torch.Tensor) and isinstance(B, torch.Tensor):
         return true_div_func(A, B, out0=out)
     elif isinstance(A, torch.Tensor):
@@ -113,6 +126,8 @@ def true_divide_out(A, B, out):
 
 def true_divide_(A, B):
     logger.debug("GEMS TRUE_DIVIDE_")
+    if isinstance(B, torch.Tensor) and B.device.type == "cpu" and B.ndim == 0:
+        B = B.to(A.device)
     if isinstance(B, torch.Tensor):
         return true_div_func(A, B, out0=A)
     else:

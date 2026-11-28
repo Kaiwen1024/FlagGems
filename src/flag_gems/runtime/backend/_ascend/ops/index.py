@@ -577,6 +577,15 @@ def _aten_index_fallback(inp, indices):
     return torch.ops.aten.index.Tensor.redispatch(_FALLBACK_KEYSET, inp, aten_indices)
 
 
+
+@triton.jit
+def _gather_masked_rows_runtime(X, IDX, OUT, N, W: tl.constexpr, BLOCK: tl.constexpr):
+    pos=tl.program_id(0)*BLOCK+tl.arange(0,BLOCK)
+    mask=pos<N
+    row=tl.load(IDX+pos//W,mask,other=0).to(tl.int32)
+    val=tl.load(X+row*W+pos%W,mask,other=0)
+    tl.store(OUT+pos,val,mask)
+
 def index(inp, indices):
     logger.debug("GEMS_ASCEND INDEX")
     indices = list(indices)
@@ -592,6 +601,25 @@ def index(inp, indices):
         for index in indices
     ]
 
+    if __import__('os').environ.get('GEMS_JINA_RUNTIME_ROW_MASK') == '1':
+        from jina_mask_rows import gather as runtime_mask
+        out = runtime_mask(inp, indices, _gather_masked_rows_runtime)
+        if out is not None:
+            return out
+
+    # One boolean row mask produces in-range indices in the original row order.
+    # Sequence length stays a runtime scalar across ragged ColBERT documents.
+    if (inp.ndim == 2 and inp.is_contiguous() and inp.shape[1] in (32,64,96,128,256)
+            and 0 < inp.numel() <= 2**31-512 and len(indices) in (1,2)
+            and (len(indices)==1 or indices[1] is None)
+            and indices[0] is not None and indices[0].dtype == torch.bool
+            and indices[0].shape == (inp.shape[0],)):
+        rows = indices[0].nonzero().reshape(-1).contiguous()
+        out = torch.empty((rows.numel(),inp.shape[1]),dtype=inp.dtype,device=inp.device)
+        if out.numel():
+            _gather_masked_rows_runtime[(triton.cdiv(out.numel(),512),)](
+                inp, rows, out, out.numel(), inp.shape[1], 512)
+        return out
     # Step 1: Process indices (convert bool/int8 to long, handle None)
     # Following PyTorch meta implementation
     processed_indices = []

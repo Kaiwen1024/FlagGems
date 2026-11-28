@@ -32,7 +32,11 @@ def _compute_broadcast_shape(tensors):
     for i in range(max_ndim):
         dim_size = 1
         for shape in padded_shapes:
-            dim_size = max(dim_size, shape[i])
+            size = shape[i]
+            if dim_size == 1:
+                dim_size = size
+            elif size != 1 and size != dim_size:
+                raise RuntimeError(f"Cannot broadcast dimensions {dim_size} and {size}")
         broadcast_shape.append(dim_size)
 
     return tuple(broadcast_shape)

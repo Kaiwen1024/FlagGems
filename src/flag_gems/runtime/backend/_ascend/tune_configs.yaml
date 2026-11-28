@@ -937,3 +937,12 @@ index_adjacent_ascend:
     BLOCK_S: 8192
     LAYOUT: 1
     SUFFIX_TILES_PER_PROGRAM: 32
+
+# Correctness campaign: one already-successful candidate avoids per-shape online search.
+linear:
+  - META:
+      BLOCK_SIZE_M: 128
+      BLOCK_SIZE_N: 64
+      BLOCK_SIZE_K: 32
+    num_stages: 4
+    num_warps: 4

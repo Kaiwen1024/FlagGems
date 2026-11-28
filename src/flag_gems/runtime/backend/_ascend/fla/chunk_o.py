@@ -61,6 +61,8 @@ def chunk_fwd_kernel_o(
         NT = tl.cdiv(T, BT)
         boh = i_n * NT
 
+    gate_base = bos if IS_VARLEN else bos * H
+
     # offset calculation
     q += (bos * Hg + i_h // (H // Hg)) * K
     k += (bos * Hg + i_h // (H // Hg)) * K
@@ -98,7 +100,7 @@ def chunk_fwd_kernel_o(
         if USE_G:
             offs_t = i_t * BT + tl.arange(0, BT)
             mask_t = offs_t < T
-            g_ptr = g + bos + i_h * T_max
+            g_ptr = g + gate_base + i_h * T_max
             b_g = tl.load(g_ptr + offs_t, mask=mask_t, other=0.0)
 
             b_o = b_o * tl.exp(b_g)[:, None]

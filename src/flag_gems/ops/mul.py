@@ -99,8 +99,12 @@ def mul_scalar_kernel(
     dtype: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
     IS_BOOL: tl.constexpr,
+    INDEX64: tl.constexpr = False,
 ):
-    offsets = tl.program_id(0) * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
+    pid = tl.program_id(0)
+    if INDEX64:
+        pid = pid.to(tl.int64)
+    offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
     x = tl.load(x_ptr + offsets, mask=mask)
     out = x & scalar if IS_BOOL else x * scalar
@@ -503,6 +507,7 @@ def _launch_scalar(tensor, scalar, output, dtype):
             n_elements,
             dtype=_dtype_name(dtype),
             IS_BOOL=_is_bool_dtype(dtype),
+            INDEX64=n_elements > 2**31 - 1,
         )
     return output
 
